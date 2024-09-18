@@ -8,3 +8,9 @@ Sandbox for graphs / graph algorithms
  - added LCC algorithm (L) and large-scale testing (space)
 	- to see testing results enable debug mode
  - removed node selection
+ - added .jar executable
+	- click to run, or open cmd.exe and run:
+
+```
+javaw.exe -jar GraphAlgos_vhw3.1.0.jar
+```
