@@ -1,30 +1,26 @@
-import java.awt.Dimension;
+import java.awt.Color;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.ArrayList;
 
 public class Node {
 
+	// screen
 	private int x, y; // screen coordinates
+	private double ux, uy; // direction unit vector
 	private ArrayList<Node> connectedNodes = new ArrayList<Node>();
+	private Color color = null;
 
 	// BFS stuff
 	private int dist = -1;
 	private Rectangle hitbox;
 
-	// randomly located node
-	public Node(Dimension screenSize, int nodeSize) {
-		double screenWidth = screenSize.getWidth();
-		double screenHeight = screenSize.getHeight();
-		x = (int) (Math.random() * screenWidth * 0.75 + screenWidth * 0.125);
-		y = (int) (Math.random() * screenHeight * 0.75 + screenHeight * 0.125);
-		hitbox = new Rectangle(x, y, nodeSize, nodeSize);
-	}
-
 	// location specified node
-	public Node(int x, int y, int nodeSize) {
+	public Node(int x, int y, double ux, double uy, int nodeSize) {
 		this.x = x;
 		this.y = y;
+		this.ux = ux;
+		this.uy = uy;
 		hitbox = new Rectangle(x, y, nodeSize, nodeSize);
 	}
 
@@ -44,6 +40,26 @@ public class Node {
 		return y;
 	}
 
+	public double getUX() {
+		return ux;
+	}
+
+	public double getUY() {
+		return uy;
+	}
+
+	public Color getColor() {
+		return color;
+	}
+
+	public void setColor(Color newColor) {
+		color = newColor;
+	}
+
+	public void resetColor() {
+		color = null;
+	}
+
 	// ---------------------------------------------------------------------------
 	// BFS stuff
 
@@ -56,8 +72,9 @@ public class Node {
 	}
 
 	public boolean clickedOn(Point click) {
-		if (hitbox.contains(click))
+		if (hitbox.contains(click)) {
 			return true;
+		}
 		return false;
 	}
 

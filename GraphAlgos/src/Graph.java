@@ -1,3 +1,4 @@
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.event.MouseEvent;
@@ -7,49 +8,67 @@ import java.util.Queue;
 
 public class Graph {
 
-	protected int V;
+	private Dimension screenSize;
+	private int nodeSize;
+
+	protected int V, n;
 	protected ArrayList<Node> nodes = new ArrayList<Node>();
 
+	protected double p;
 	protected int E;
 	protected ArrayList<Edge> edges = new ArrayList<Edge>();
 
-	protected Node start = null; // one of the existing nodes
-	protected Node end = null;
-	protected ArrayList<Node> pathNodes = new ArrayList<Node>();
-	// protected ArrayList<Edge> pathEdges = new ArrayList<Edge>(); // TOREMOVE: unused
+	protected Node selected = null;
+	protected ArrayList<Integer> componentSizes = new ArrayList<Integer>();
 
 	public Graph() {
 	}
 
-	public Graph(int n, Dimension screenSize, int nodeSize) {
-		generate(n, screenSize, nodeSize);
+	public Graph(int n, double p, Dimension screenSize, int nodeSize) {
+		this.screenSize = screenSize;
+		this.nodeSize = nodeSize;
+		generate(n, p);
 	}
 
-	public void generate(int n, Dimension screenSize, int nodeSize) {
-		V = n;
+	/*
+	Erdös-Rényi undirected random graph
+	 - n, p are for graph generation
+	 - screenSize, nodeSize are for aesthetics and interaction
+	 */
+	public void generate(int n, double p) {
+		// saving new values
+		this.n = n;
+		V = n; // redundant
+		this.p = p;
 
-		// generating random nodes
-		for (int i = 0; i < V; ++i)
-			newNode(screenSize, nodeSize);
+		// generating nodes in a circular shape for easy viewing
+		// determining center
+		int screenWidth = (int) screenSize.getWidth();
+		int screenHeight = (int) screenSize.getHeight();
+		int xo = screenWidth / 2;
+		int yo = screenHeight / 2;
+		// determining radius
+		double r = yo * 0.75;
+		// determining angle
+		double theta = 2 * Math.PI / V; // in radians
+		// actually creating nodes
+		for (int i = 0; i < V; ++i) {
+			double ux = Math.cos(theta * i);
+			double uy = Math.sin(theta * i);
+			int x = (int) (xo + ux * r);
+			int y = (int) (yo + uy * r);
+			nodes.add(new Node(x, y, ux, uy, nodeSize));
+		}
 
 		// generating random edges
-		E = (int) (1.5 * n);
-		for (int i = 0; i < E; ++i)
-			newEdge();
-
-		/*
-		for (int n1 = 0; n1 < V; ++n1) {
-			// getting second node
-			int n2 = (int) (Math.random() * (V - 1));
-			if (n2 <= n1)
-				n2++;
-		
-			// generating edge; TOFIX: may be duplicate
-			Node node1 = nodes.get(n1);
-			Node node2 = nodes.get(n2);
-			edges.add(new Edge(node1, node2));
+		for (int i = 0; i < n; ++i) {
+			for (int j = i + 1; j < n; ++j) {
+				double q = Math.random();
+				if (q < p)
+					edges.add(new Edge(nodes.get(i), nodes.get(j)));
+			}
 		}
-		*/
+		E = edges.size();
 	}
 
 	public void clear() {
@@ -57,34 +76,13 @@ public class Graph {
 		nodes.clear();
 		E = 0;
 		edges.clear();
-		start = null;
-		end = null;
-		pathNodes.clear();
+		selected = null;
+		componentSizes.clear();
 	}
 
-	public void regenerate(int n, Dimension screenSize, int node) {
+	public void regenerate(int n, double p) {
 		clear();
-		generate(n, screenSize, node);
-	}
-
-	// generates a random node
-	public void newNode(Dimension screenSize, int nodeSize) {
-		nodes.add(new Node(screenSize, nodeSize));
-	}
-
-	// generates a random edge
-	public void newEdge() {
-		Edge newEdge = null;
-		while (newEdge == null || edges.contains(newEdge)) {
-			if (edges.contains(newEdge)) // debug
-				System.out.println("Debug: Duplicate edge; regenerating edge...");
-			int i1 = (int) (Math.random() * V);
-			int i2 = i1;
-			while (i1 == i2)
-				i2 = (int) (Math.random() * V);
-			newEdge = new Edge(nodes.get(i1), nodes.get(i2));
-		}
-		edges.add(newEdge);
+		generate(n, p);
 	}
 
 	public ArrayList<Node> getNodes() {
@@ -98,112 +96,92 @@ public class Graph {
 	// ---------------------------------------------------------------------------
 	// BFS stuff
 
-	public Node getStart() {
-		return start;
-	}
-
-	public Node getEnd() {
-		return end;
-	}
-
-	public ArrayList<Node> getPathNodes() {
-		return pathNodes;
+	public Node getSelected() {
+		return selected;
 	}
 
 	public void selectRandom() {
-		selectStart(nodes.get((int) (Math.random() * nodes.size())));
+		selected = nodes.get((int) (Math.random() * nodes.size()));
 	}
 
-	public void selectStart(Node selected) {
-		pathNodes.clear();
-		start = selected;
-		pathNodes.add(start);
-		runBFS();
-	}
-
-	public void selectEnd(Node selected) {
-		if (start == null)
-			selectStart(selected);
-		else {
-			pathNodes.clear();
-			pathNodes.add(start);
-			end = selected;
-			tracePath();
-		}
-	}
-
-	public void runBFS() {
-		// resetting all distances
-		for (Node node : nodes)
-			node.updateDist(-1);
+	public int runBFS() {
+		// selecting random color for component
+		Color componentColor = new Color((int) (Math.random() * 255), (int) (Math.random() * 255), (int) (Math.random() * 255));
 
 		// starting at start
-		start.updateDist(0);
+		selected.updateDist(0);
 
 		// BFS loop
 		Queue<Node> queue = new LinkedList<Node>();
-		queue.add(start);
+		queue.add(selected);
+		int size = 0; // number of nodes in the component
 		while (queue.isEmpty() == false) {
 			// getting node
 			Node tempSubject = queue.poll();
+			tempSubject.setColor(componentColor);
+			size++;
 
 			// determining distance & updating queue
 			int dist = tempSubject.getDist() + 1;
-			ArrayList<Node> connectedNodes = tempSubject.getConnectedNodes();
+			ArrayList<Node> connectedNodes = tempSubject.getConnectedNodes(); // getting connected nodes
 			for (Node node : connectedNodes) {
 				if (node.getDist() != -1)
 					continue;
 				node.updateDist(dist);
-				queue.add(node);
+				queue.add(node); // adding connected nodes to queue
 			}
 		}
+
+		return size;
 	}
 
-	public void tracePath() {
-		// run BFS
-		runBFS();
-
-		// starting at end
-		Node next = end;
-
-		// tracing back to start
-		while (next != start) {
-			// adding to path
-			pathNodes.add(1, next);
-
-			// finding next node
-			ArrayList<Node> connectedNodes = next.getConnectedNodes();
-			int min = next.getDist();
-			Node nextNode = null;
-			for (Node node : connectedNodes) {
-				int newMin = node.getDist();
-				if (newMin < min) {
-					min = newMin;
-					nextNode = node;
-				}
-			}
-
-			// TOFIX: no next node was found; break
-			/*
-			if (min != 0 && nextNode == null)
-				break;
-			*/
-
-			next = nextNode;
-		}
+	public void selectNode(Node node) {
+		selected = node;
 	}
 
-	public boolean selectNode(Point click, int button) {
+	public boolean selectNode(Point click) {
 		for (Node node : nodes) {
 			if (node.clickedOn(click)) {
-				if (button == MouseEvent.BUTTON1)
-					selectStart(node);
-				else if (button == MouseEvent.BUTTON3)
-					selectEnd(node);
+				selectNode(node);
 				return true;
 			}
 		}
 		return false;
+	}
+
+	// ---------------------------------------------------------------------------
+	// Largest Connected Component (LCC) stuff
+
+	public void importSizes(ArrayList<Integer> sizes) {
+		componentSizes = sizes;
+	}
+
+	public ArrayList<Integer> getSizes() {
+		return componentSizes;
+	}
+
+	public static int runLCC(Graph G, int t) {
+		// resetting all distances
+		ArrayList<Node> nodes = G.getNodes();
+		for (Node node : nodes)
+			node.updateDist(-1);
+
+		// running BFS until all components found
+		ArrayList<Integer> componentSizes = new ArrayList<Integer>();
+		for (Node node : nodes) {
+			if (node.getDist() == -1) {
+				G.selectNode(node);
+				componentSizes.add(G.runBFS()); // storing component sizes
+			}
+		}
+
+		// checking component sizes
+		G.importSizes(componentSizes);
+		for (Integer size : componentSizes) {
+			if (size >= t)
+				return 1;
+		}
+		return 0;
 	}
 
 }
